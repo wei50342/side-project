@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WorkTracker (Dark)</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Menlo', 'Monaco', 'Courier New', monospace; } /* 程式碼字體 */
+        .chip { transition: all 0.2s; }
+        /* 自訂捲軸 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen pb-32 selection:bg-emerald-500 selection:text-white">
+
+    <div class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 p-4 sticky top-0 z-50 flex justify-between items-center">
+        <h1 class="text-lg font-bold text-emerald-400">⚡ Work_Log: v4.1</h1>
+        <button onclick="copyData()" class="text-xs bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 px-3 py-1.5 rounded transition">Copy JSON</button>
+    </div>
+
+    <div class="max-w-md mx-auto p-4 space-y-6">
+        
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-5 shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
+                <span class="text-slate-400 text-sm font-bold">DASHBOARD</span>
+                <span class="text-xs text-emerald-500 cursor-pointer hover:underline" onclick="selectAllMonths()">[Select All]</span>
+            </div>
+            <div id="monthFilter" class="flex flex-wrap gap-2 mb-4"></div>
+            <div class="bg-slate-950 rounded border border-slate-800 p-4 text-center mb-4 relative overflow-hidden group">
+                <div class="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition"></div>
+                <p class="text-xs text-slate-500 mb-1 uppercase tracking-wider">Total Hours</p>
+                <p class="text-4xl font-bold text-emerald-400" id="filteredTotal">0h 0m</p>
+            </div>
+            <canvas id="hoursChart" height="200"></canvas>
+        </div>
+
+        <div id="inputSection" class="bg-slate-900 border border-slate-800 rounded-lg p-5 shadow-lg relative transition-all duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-slate-200 font-bold flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Input
+                </h2>
+                <span id="editModeBadge" class="hidden text-xs bg-yellow-900/50 text-yellow-200 border border-yellow-700 px-2 py-1 rounded">EDITING</span>
+            </div>
+            
+            <div class="mb-4">
+                <input type="date" id="inputDate" class="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition">
+            </div>
+
+            <div id="timeSegments" class="space-y-2 mb-4"></div>
+
+            <button onclick="addSegment()" class="w-full mb-3 text-slate-400 text-sm py-2 border border-slate-700 border-dashed rounded hover:bg-slate-800 hover:text-emerald-400 transition">
+                + Add Time Block
+            </button>
+
+            <div class="flex gap-3">
+                <button onclick="saveRecord()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded shadow-lg shadow-emerald-900/20 transition transform active:scale-95">
+                    Save Record
+                </button>
+                <button onclick="cancelEdit()" id="cancelBtn" class="hidden px-4 bg-slate-800 text-slate-400 hover:text-white rounded border border-slate-700 transition">Cancel</button>
+            </div>
+        </div>
+
+        <div class="bg-black border border-slate-800 rounded-lg p-4 font-mono text-sm">
+            <div class="flex justify-between items-center mb-2 cursor-pointer select-none" onclick="toggleImport()">
+                <h2 class="text-yellow-500 font-bold">> Bulk_Import / Edit</h2>
+                <span id="importToggleIcon" class="text-slate-500">▼</span>
+            </div>
+            <div id="importPanel" class="hidden mt-3">
+                <p class="text-xs text-slate-500 mb-2"># Format: MM/DD 0800-1200</p>
+                <textarea id="rawInput" rows="5" class="w-full p-3 rounded bg-slate-900 border border-slate-700 text-slate-300 focus:border-yellow-500 outline-none mb-3" placeholder="12/16 0800-1200..."></textarea>
+                <button onclick="parseAndSave()" class="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded transition">
+                    Run Script
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-5">
+            <h2 class="text-slate-400 text-sm font-bold mb-4 border-b border-slate-800 pb-2">HISTORY_LOG</h2>
+            <ul id="historyList" class="space-y-3"></ul>
+        </div>
+    </div>
+
+    <script>
+        // --- Core Vars ---
+        const inputDate = document.getElementById('inputDate');
+        const timeSegments = document.getElementById('timeSegments');
+        const historyList = document.getElementById('historyList');
+        const monthFilter = document.getElementById('monthFilter');
+        const filteredTotal = document.getElementById('filteredTotal');
+        const editModeBadge = document.getElementById('editModeBadge');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const inputSection = document.getElementById('inputSection');
+
+        let records = JSON.parse(localStorage.getItem('workRecords')) || [];
+        let selectedMonths = []; 
+
+        // --- Init ---
+        inputDate.valueAsDate = new Date();
+        addSegment();
+        initFilters();
+        renderHistoryList();
+
+        // --- Bulk Import ---
+        function toggleImport() { document.getElementById('importPanel').classList.toggle('hidden'); }
+
+        function parseAndSave() {
+            const rawText = document.getElementById('rawInput').value;
+            if(!rawText.trim()) return alert("No Input Data");
+            const currentYear = new Date().getFullYear();
+            const lines = rawText.trim().split('\n');
+            let count = 0;
+
+            lines.forEach(line => {
+                line = line.trim();
+                if (!line) return;
+                const parts = line.split(/\s+/);
+                const dateStr = parts[0]; 
+                const timeRanges = parts.slice(1);
+                let formattedDate = "";
+
+                if(dateStr.includes('/')) {
+                    const [m, d] = dateStr.split('/');
+                    if(dateStr.split('/').length === 3) formattedDate = dateStr.replace(/\//g, '-');
+                    else {
+                         let y = currentYear;
+                         const m_int = parseInt(m);
+                         const nowM = new Date().getMonth() + 1;
+                         if(m_int > nowM + 6) y -= 1;
+                         formattedDate = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+                    }
+                } else if(dateStr.includes('-')) formattedDate = dateStr;
+
+                let dailyMin = 0;
+                let segments = [];
+                const fmt = t => (t && t.length === 4) ? `${t.slice(0,2)}:${t.slice(2)}` : t;
+
+                timeRanges.forEach(range => {
+                    if(!range.includes('-')) return;
+                    let [rawS, rawE] = range.split('-');
+                    const s = fmt(rawS);
+                    if(!rawE || rawE === '???') {
+                        segments.push(`${s}-???`);
+                    } else {
+                        const e = fmt(rawE);
+                        const sMin = parseInt(s.split(':')[0])*60 + parseInt(s.split(':')[1]);
+                        const eMin = parseInt(e.split(':')[0])*60 + parseInt(e.split(':')[1]);
+                        let dur = eMin - sMin;
+                        if(dur < 0) dur += 24*60;
+                        dailyMin += dur;
+                        segments.push(`${s}-${e}`);
+                    }
+                });
+
+                if(segments.length > 0) {
+                    records = records.filter(r => r.date !== formattedDate);
+                    records.push({ date: formattedDate, minutes: dailyMin, segments: segments, timestamp: Date.now() });
+                    count++;
+                }
+            });
+
+            records.sort((a,b) => new Date(b.date) - new Date(a.date));
+            localStorage.setItem('workRecords', JSON.stringify(records));
+            initFilters(); renderHistoryList();
+            document.getElementById('rawInput').value = '';
+            toggleImport();
+            alert(`Updated ${count} records.`);
+        }
+
+        // --- GUI Logic ---
+        function addSegment(s='', e='') {
+            const div = document.createElement('div');
+            div.className = 'time-row flex gap-2 mb-2 items-center';
+            div.innerHTML = `<input type="time" value="${s}" class="start-time w-5/12 p-2 border border-slate-700 rounded bg-slate-950 text-white text-center"><span class="text-slate-500">➜</span><input type="time" value="${e}" class="end-time w-5/12 p-2 border border-slate-700 rounded bg-slate-950 text-white text-center"><button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-400 font-bold px-2 text-xl">×</button>`;
+            timeSegments.appendChild(div);
+        }
+
+        function saveRecord() {
+            const date = inputDate.value;
+            if(!date) return alert('Date?');
+            const starts = document.querySelectorAll('.start-time');
+            const ends = document.querySelectorAll('.end-time');
+            let dailyMin = 0, segs = [], hasInput = false;
+
+            for(let i=0; i<starts.length; i++){
+                const s=starts[i].value, e=ends[i].value;
+                if(s){
+                    hasInput = true;
+                    if(e){
+                        const sM=parseInt(s.split(':')[0])*60+parseInt(s.split(':')[1]);
+                        const eM=parseInt(e.split(':')[0])*60+parseInt(e.split(':')[1]);
+                        let d=eM-sM; if(d<0)d+=1440;
+                        dailyMin+=d; segs.push(`${s}-${e}`);
+                    } else { segs.push(`${s}-???`); }
+                }
+            }
+            if(!hasInput) return alert('Time?');
+
+            records = records.filter(r=>r.date!==date);
+            records.push({date, minutes:dailyMin, segments:segs, timestamp:Date.now()});
+            records.sort((a,b)=>new Date(b.date)-new Date(a.date));
+            localStorage.setItem('workRecords',JSON.stringify(records));
+            resetForm(); initFilters(); renderHistoryList();
+        }
+        
+        // --- Filter & Display ---
+        function initFilters() {
+            const all = [...new Set(records.map(r=>r.date.slice(0,7)))].sort().reverse();
+            if(selectedMonths.length===0 && all.length>0) selectedMonths=[all[0]];
+            monthFilter.innerHTML='';
+            all.forEach(m=>{
+                const btn=document.createElement('button');
+                const active=selectedMonths.includes(m);
+                // Styles for Dark Mode Chips
+                btn.className=`chip text-xs px-3 py-1.5 rounded border font-mono ${active?'bg-emerald-600 text-white border-emerald-500':'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`;
+                btn.innerText=m;
+                btn.onclick=()=>toggleMonth(m);
+                monthFilter.appendChild(btn);
+            });
+            updateStats();
+        }
+        function toggleMonth(m){
+            selectedMonths.includes(m)?selectedMonths=selectedMonths.filter(x=>x!==m):selectedMonths.push(m);
+            initFilters();
+        }
+        function selectAllMonths(){
+            selectedMonths=[...new Set(records.map(r=>r.date.slice(0,7)))];
+            initFilters();
+        }
+        function updateStats(){
+            const tg = records.filter(r=>selectedMonths.includes(r.date.slice(0,7)));
+            filteredTotal.innerText = formatMinutes(tg.reduce((a,b)=>a+b.minutes,0));
+            renderChart(tg);
+            renderHistoryList(tg); 
+        }
+        
+        // Updated Chart Color for Dark Mode
+        function renderChart(dataArr){
+            const sorted = [...dataArr].sort((a,b)=>new Date(a.date)-new Date(b.date));
+            const ctx = document.getElementById('hoursChart').getContext('2d');
+            if(window.myChart) window.myChart.destroy();
+            
+            // Set Chart Defaults for Dark Mode
+            Chart.defaults.color = '#94a3b8'; // slate-400
+            Chart.defaults.borderColor = '#1e293b'; // slate-800
+
+            window.myChart = new Chart(ctx, {
+                type:'bar',
+                data:{
+                    labels:sorted.map(r=>r.date.slice(5)),
+                    datasets:[{
+                        label:'Hrs',
+                        data:sorted.map(r=>(r.minutes/60).toFixed(1)),
+                        backgroundColor:'#10b981', // emerald-500
+                        borderRadius:2
+                    }]
+                },
+                options:{
+                    responsive:true, 
+                    plugins:{legend:{display:false}}, 
+                    scales:{y:{beginAtZero:true, grid:{color:'#1e293b'}}, x:{grid:{display:false}}}
+                }
+            });
+        }
+        
+        function loadForEdit(d){
+            const r=records.find(x=>x.date===d); if(!r)return;
+            inputDate.value=r.date; timeSegments.innerHTML='';
+            editModeBadge.classList.remove('hidden'); cancelBtn.classList.remove('hidden');
+            inputSection.classList.add('ring-2', 'ring-emerald-500'); // Ring color change
+            r.segments.forEach(s=>{ const[st,en]=s.split('-'); addSegment(st,en==='???'?'':en); });
+            window.scrollTo({top:0,behavior:'smooth'});
+        }
+        function cancelEdit(){ resetForm(); }
+        function resetForm(){ inputDate.valueAsDate=new Date(); timeSegments.innerHTML=''; addSegment(); editModeBadge.classList.add('hidden'); cancelBtn.classList.add('hidden'); inputSection.classList.remove('ring-2', 'ring-emerald-500'); }
+        
+        function renderHistoryList(targetRecords){
+            const listData = targetRecords || records;
+            historyList.innerHTML='';
+            listData.forEach(r=>{
+                const li=document.createElement('li');
+                const work=r.segments.some(s=>s.includes('???'));
+                // Dark Mode List Item Styles
+                li.className=`flex justify-between items-center p-3 rounded border-l-4 border-t border-b border-r ${work?'bg-yellow-900/20 border-l-yellow-500 border-t-yellow-900/50 border-r-yellow-900/50 border-b-yellow-900/50':'bg-slate-900 border-l-emerald-500 border-slate-800'} transition hover:bg-slate-800`;
+                
+                li.innerHTML=`<div onclick="loadForEdit('${r.date}')" class="flex-grow cursor-pointer">
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-slate-200 font-mono">${r.date}</span> 
+                        ${work?'<span class="text-[10px] bg-yellow-900 text-yellow-200 px-1 rounded border border-yellow-700">WAITING</span>':''}
+                    </div>
+                    <div class="text-xs text-slate-500 font-mono mt-1">${r.segments.map(s=>s.replace('???','...')).join(', ')}</div>
+                </div>
+                <div class="font-bold text-emerald-400 font-mono">${formatMinutes(r.minutes)}</div>`;
+                historyList.appendChild(li);
+            });
+        }
+        function formatMinutes(m){ return `${Math.floor(m/60)}h ${m%60}m`; }
+        function copyData(){ 
+             const txt = records.map(r => `${r.date.replace(/-/g,'/').slice(5)} ${r.segments.map(s=>s.replace(':','').replace(':','')).join(' ')}`).join('\n');
+             navigator.clipboard.writeText(txt).then(()=>alert('Copied to clipboard!'));
+        }
+    </script>
+</body>
+</html>
