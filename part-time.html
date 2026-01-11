@@ -17,11 +17,20 @@
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-PY0DTLM60T"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-PY0DTLM60T');
+    </script>
 </head>
 <body class="bg-slate-950 text-slate-200 min-h-screen pb-32 selection:bg-emerald-500 selection:text-white">
 
     <div class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 p-4 sticky top-0 z-50 flex justify-between items-center">
-        <h1 class="text-lg font-bold text-emerald-400">⚡ Work_Log: v4.1</h1>
+        <h1 class="text-lg font-bold text-emerald-400">⚡ 出勤表</h1>
         <button onclick="copyData()" class="text-xs bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 px-3 py-1.5 rounded transition">Copy JSON</button>
     </div>
 
