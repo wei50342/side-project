@@ -7,18 +7,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* --- Colors --- */
-            --accent: #3b82f6;      /* Regular / Heel */
-            --danger: #ef4444;      /* Goofy / Toe */
+            --accent: #3b82f6;
+            --danger: #ef4444;
             --dark: #0f172a;
             --text-main: #f8fafc;
             --text-sub: #94a3b8;
-            
-            /* --- Materials --- */
             --board-top: #334155;
             --board-base: #f59e0b;
-            
-            /* --- Easing --- */
             --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
         }
 
@@ -39,7 +34,7 @@
             background: radial-gradient(circle at top, #1e293b 0%, var(--dark) 100%);
         }
         h1 {
-            font-size: 2.5rem; font-weight: 900;
+            font-size: 2.2rem; font-weight: 900;
             background: linear-gradient(to right, #fff, #94a3b8);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             margin-bottom: 0.5rem;
@@ -58,8 +53,14 @@
             border-bottom: 1px solid rgba(255,255,255,0.05);
         }
 
+        /* 手機版排版優化 */
         @media (max-width: 900px) {
-            .skill-section { grid-template-columns: 1fr; gap: 1.5rem; text-align: center; }
+            .skill-section { 
+                grid-template-columns: 1fr; 
+                gap: 2rem; 
+                text-align: center; 
+                padding: 3rem 0;
+            }
             .content-area { order: 2; } 
             .visual-area { order: 1; }
             h2 { justify-content: center; }
@@ -67,7 +68,7 @@
             .btn-group { justify-content: center; }
         }
 
-        /* --- Typography & Buttons --- */
+        /* --- UI Elements --- */
         h2 { font-size: 1.8rem; margin-bottom: 1rem; color: white; display: flex; align-items: center; gap: 10px; }
         .badge { background: var(--accent); font-size: 0.8rem; padding: 4px 8px; border-radius: 6px; white-space: nowrap;}
         .jp-term { font-size: 0.8rem; color: var(--text-sub); background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-weight: normal; }
@@ -89,8 +90,8 @@
         /* --- Stage System --- */
         .stage {
             width: 100%;
-            min-height: 300px; /* Mobile Fix */
-            aspect-ratio: 16/10;
+            /* 手機版高度修復：給予足夠空間防止切邊 */
+            min-height: 320px;
             background: #cbd5e1;
             border-radius: 20px;
             position: relative; overflow: hidden;
@@ -99,17 +100,16 @@
             transform-style: preserve-3d;
         }
         
-        /* Layer Management */
         .atmosphere {
             position: absolute; inset: 0; pointer-events: none; z-index: 1;
-            background: radial-gradient(circle at center, transparent 30%, rgba(15, 23, 42, 0.4) 100%);
+            background: radial-gradient(circle at center, transparent 30%, rgba(15, 23, 42, 0.3) 100%);
         }
         .noise {
             position: absolute; inset: 0; opacity: 0.05; pointer-events: none; z-index: 2;
             background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
         }
         
-        /* Content Layers (Z-10) */
+        /* 確保內容層級高於特效 */
         .center-wrapper, .side-rider, .z-motion, .sturn-path, .carve-anim, .ollie-anim, .trace-layer {
             z-index: 10;
         }
@@ -121,17 +121,12 @@
             z-index: 20; backdrop-filter: blur(4px);
         }
 
-        /* --- 3D Models --- */
+        /* --- 3D Objects Base --- */
         .center-wrapper {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             display: flex; justify-content: center; align-items: center;
             transform-style: preserve-3d;
-        }
-
-        @media (max-width: 600px) {
-            .stance-v { transform: scale(0.85); } 
-            .side-rider { transform: scale(0.9) translateX(-50%); transform-origin: bottom center; }
         }
 
         .pro-board {
@@ -157,7 +152,7 @@
         .pro-goggles { width: 20px; height: 10px; background: #3b82f6; border-radius: 5px; position: absolute; top: 9px; left: 4px; border: 2px solid var(--dark); }
         .pro-strap { width: 24px; height: 6px; background: var(--dark); position: absolute; top: 11px; left: 2px; display: none; z-index: -1; }
 
-        /* --- SCENE 1: STANCE --- */
+        /* --- L0: STANCE --- */
         .stance-v {
             width: 60px; height: 180px; background: var(--board-top);
             border-radius: 30px; position: relative; box-shadow: 0 15px 35px rgba(0,0,0,0.4);
@@ -173,7 +168,7 @@
         [data-stance="goofy"] .b-right { bottom: 25px; transform: translateX(-50%) rotate(-15deg); background: rgba(239,68,68,0.6); border-color:var(--danger);}
         [data-stance="goofy"] .b-left { top: 25px; transform: translateX(-50%) rotate(0deg); }
 
-        /* --- SCENE 2: SAFETY --- */
+        /* --- L0.5: SAFETY --- */
         .stage-side { align-items: flex-end; padding-bottom: 40px; background: #e2e8f0; }
         .floor { position: absolute; bottom: 35px; width: 100%; height: 2px; background: #94a3b8; z-index: 5; }
 
@@ -203,7 +198,7 @@
             65% { transform: translateY(10px) rotate(45deg); } 85%, 100% { transform: translateY(0) rotate(0deg); }
         }
 
-        /* --- SCENE 3: LEAF (Scrolling) --- */
+        /* --- L1/2: LEAF --- */
         .snow-scroll {
             background: linear-gradient(#cbd5e1 2px, transparent 2px), linear-gradient(90deg, #cbd5e1 2px, transparent 2px);
             background-size: 40px 40px; background-color: #f1f5f9;
@@ -224,21 +219,18 @@
         [data-leaf="toe"] .pro-helmet { transform: translate(-50%, -50%) translateZ(16px) rotate(180deg); }
         [data-leaf="toe"] .pro-strap { display: block; }
 
-        /* --- SCENE 4: GARLANDS (Stomp It Tutorial) --- */
-        /* J-Shape / Garland Path */
+        /* --- L2.5: GARLANDS --- */
         .garland-path { animation: garlandMove 4s ease-in-out infinite; will-change: transform; }
         @keyframes garlandMove {
             0%, 100% { transform: translate(-50%, -50%) translateX(0); }
-            50% { transform: translate(-50%, -50%) translateX(80px); } /* 移動距離 */
+            50% { transform: translate(-50%, -50%) translateX(70px); }
         }
-        
         .garland-anim { animation: garlandRoll 4s ease-in-out infinite; will-change: transform; width: 44px; height: 140px; }
         
-        /* Heel Garland: Heel -> Flat -> Heel (Never Toe) */
         [data-garland="heel"] .garland-anim { animation-name: gHeel; }
         @keyframes gHeel {
-            0%, 100% { transform: rotateZ(-45deg) rotateX(30deg); } /* Heel Traverse */
-            40%, 60% { transform: rotateZ(0deg) rotateX(0deg); }    /* Point Down (Flat) */
+            0%, 100% { transform: rotateZ(-45deg) rotateX(30deg); }
+            40%, 60% { transform: rotateZ(0deg) rotateX(0deg); }
         }
         [data-garland="heel"] .pro-helmet { animation: headHeel 4s infinite; }
         @keyframes headHeel {
@@ -246,11 +238,10 @@
             40%, 60% { transform: translate(-50%, -50%) translateZ(16px) rotate(0deg); }
         }
 
-        /* Toe Garland: Toe -> Flat -> Toe (Never Heel) */
         [data-garland="toe"] .garland-anim { animation-name: gToe; }
         @keyframes gToe {
-            0%, 100% { transform: rotateZ(45deg) rotateX(-30deg); } /* Toe Traverse */
-            40%, 60% { transform: rotateZ(0deg) rotateX(0deg); }    /* Point Down (Flat) */
+            0%, 100% { transform: rotateZ(45deg) rotateX(-30deg); }
+            40%, 60% { transform: rotateZ(0deg) rotateX(0deg); }
         }
         [data-garland="toe"] .pro-helmet { animation: headToe 4s infinite; }
         @keyframes headToe {
@@ -258,7 +249,7 @@
             40%, 60% { transform: translate(-50%, -50%) translateZ(16px) rotate(0deg); }
         }
 
-        /* --- SCENE 5: S-TURN (C-Shape) --- */
+        /* --- L3: S-TURN --- */
         .trace-layer { position: absolute; top: -50%; left: 0; width: 100%; height: 200%; opacity: 0.4; animation: scrollY 4s linear infinite; pointer-events: none;}
         
         .sturn-c-shape { animation: cPath 4s ease-in-out infinite; will-change: transform; }
@@ -273,11 +264,11 @@
         .sturn-action { width: 44px; height: 140px; animation: cRoll 4s ease-in-out infinite; will-change: transform; }
         @keyframes cRoll {
             0% { transform: rotateZ(0deg) rotateX(0deg); }
-            25% { transform: rotateZ(-70deg) rotateX(35deg); } /* Full Heel Turn */
+            25% { transform: rotateZ(-70deg) rotateX(35deg); }
             45% { transform: rotateZ(-10deg) rotateX(0deg); } 
-            50% { transform: rotateZ(0deg) rotateX(0deg); }    /* Flat Patience */
+            50% { transform: rotateZ(0deg) rotateX(0deg); }
             55% { transform: rotateZ(10deg) rotateX(0deg); }
-            75% { transform: rotateZ(70deg) rotateX(-35deg); } /* Full Toe Turn */
+            75% { transform: rotateZ(70deg) rotateX(-35deg); }
             100% { transform: rotateZ(0deg) rotateX(0deg); }
         }
         .sturn-action .pro-helmet { animation: cHead 4s ease-in-out infinite; }
@@ -290,7 +281,7 @@
             100% { transform: translate(-50%, -50%) translateZ(16px) rotate(-30deg); }
         }
 
-        /* --- SCENE 6: CARVING --- */
+        /* --- L4: CARVING --- */
         .speed-fx {
             position: absolute; inset: 0;
             background: repeating-linear-gradient(90deg, transparent, transparent 95%, rgba(255,255,255,0.5) 98%, transparent 100%);
@@ -304,7 +295,7 @@
             100% { transform: translateX(80px) rotateX(-65deg) rotateZ(-15deg); }
         }
 
-        /* --- SCENE 7: OLLIE --- */
+        /* --- L5: OLLIE --- */
         .ollie-anim { 
             animation: ollieMove 3s linear infinite; position: absolute; bottom: 37px; width: 100px;
             will-change: transform;
@@ -324,6 +315,69 @@
         @keyframes legSpring {
             0%, 10% { height: 38px; } 20% { height: 25px; } 30% { height: 45px; }
             50% { height: 25px; } 80% { height: 25px; } 90%, 100% { height: 38px; }
+        }
+
+        /* =================================================================
+           🔥 MOBILE FIX: 強制縮小視覺元件 & 校正中心點 (Max-width: 600px)
+           ================================================================= */
+        @media (max-width: 600px) {
+            
+            /* 1. STANCE: 縮小並確保置中 */
+            .stance-v { 
+                transform: scale(0.75); 
+                /* 由於 center-wrapper 已經置中，這裡不需要額外 translate */
+            }
+
+            /* 2. SIDE VIEW: 縮小並靠下對齊 */
+            .side-rider { 
+                transform: scale(0.75) translateX(-65%); 
+                transform-origin: bottom center; 
+                bottom: 45px; /* 微調高度 */
+            }
+
+            /* 3. PRO BOARD (Leaf, S-Turn, Carve): 全局縮小 */
+            /* 必須包含原本的 rotateX 狀態，否則會覆蓋動畫 */
+            
+            /* Leaf - Heel */
+            [data-leaf="heel"] .pro-board { 
+                transform: scale(0.75) rotateX(35deg) !important; 
+            }
+            /* Leaf - Toe */
+            [data-leaf="toe"] .pro-board { 
+                transform: scale(0.75) rotateX(-35deg) !important; 
+            }
+            
+            /* Garland / S-Turn / Carve */
+            /* 這些動畫是在 parent (.sturn-action, .garland-anim) 上運作，
+               我們可以直接縮小這些 parent container，或者縮小內部的 pro-board */
+            
+            .sturn-action, .garland-anim {
+                transform: scale(0.75); /* 這會破壞 animation 嗎？會。*/
+                /* 正確做法：縮放 animation 的父層 wrapper */
+            }
+
+            /* 修正方案：針對移動類動畫，我們直接修改 keyframes 太複雜，
+               不如直接使用 zoom (非標準但有效) 或針對 .visual-area 內容做 scale */
+            
+            /* 最終手段：針對 3D 場景內的中心容器進行縮放 */
+            .center-wrapper {
+                /* 注意：這可能會影響到已經有 transform 的動畫 */
+            }
+
+            /* 針對 S-Turn 和 Garland 的直板 */
+            .sturn-action, .garland-anim {
+                zoom: 0.75; /* 最乾淨的解決方案，不干擾 transform */
+            }
+            
+            /* 針對 Carve */
+            .carve-anim {
+                zoom: 0.75;
+            }
+
+            /* 針對 Ollie */
+            .ollie-anim {
+                zoom: 0.75;
+            }
         }
 
     </style>
@@ -350,7 +404,7 @@
         <section class="skill-section">
             <div class="content-area">
                 <h2><span class="badge">L0</span> 站姿設定 <span class="jp-term">スタンス</span></h2>
-                <p>左腳前 Regular，右腳前 Goofy。初學者建議先用 Regular。</p>
+                <p>左腳前 Regular，右腳前 Goofy。</p>
                 <div class="btn-group">
                     <button class="btn active" onclick="setStance('regular', this)">Regular</button>
                     <button class="btn danger" onclick="setStance('goofy', this)">Goofy</button>
@@ -374,9 +428,6 @@
             <div class="content-area">
                 <h2><span class="badge">L0.5</span> 安全摔倒與站立 <span class="jp-term">転び方</span></h2>
                 <p>摔倒時雙手抱胸。站起時利用翻身轉體。</p>
-                <div class="key-points" id="safetyInfo">
-                    <div class="point">摔倒時：雙手抱胸，背部著地</div>
-                </div>
                 <div class="btn-group">
                     <button class="btn danger active" onclick="setSafety('fall', this)">摔倒 (Fall)</button>
                     <button class="btn" onclick="setSafety('stand', this)">站起 (Stand)</button>
@@ -425,12 +476,8 @@
 
         <section class="skill-section">
             <div class="content-area">
-                <h2><span class="badge">L2.5</span> 花環練習 (Garlands) <span class="jp-term">ガーランド</span></h2>
-                <p>這是 S Turn 的前置練習。不要換刃，練習「直板加速 (Flat)」後轉回「同側煞車」。</p>
-                <div class="key-points">
-                    <div class="point">直板 (Flat) = 加速 (Point Down)</div>
-                    <div class="point">轉回同側邊刃 = 減速 (Control)</div>
-                </div>
+                <h2><span class="badge">L2.5</span> 花環練習 <span class="jp-term">ガーランド</span></h2>
+                <p>直板加速 (Flat) 後轉回同側煞車，不換刃。</p>
                 <div class="btn-group">
                     <button class="btn active" onclick="setGarland('heel', this)">Heel Garland</button>
                     <button class="btn danger" onclick="setGarland('toe', this)">Toe Garland</button>
@@ -442,7 +489,6 @@
                     <div class="trace-layer" style="opacity:0.3;">
                          <svg viewBox="0 0 200 400" preserveAspectRatio="none"><path d="M50,0 Q100,200 50,400" fill="none" stroke="white" stroke-width="4" stroke-dasharray="10"/></svg>
                     </div>
-                    
                     <div class="center-wrapper garland-path" id="garlandContainer" data-garland="heel">
                         <div class="pro-board garland-anim">
                             <div class="pro-helmet">
@@ -457,12 +503,8 @@
 
         <section class="skill-section">
             <div class="content-area">
-                <h2><span class="badge">L3</span> S型轉彎 (C-Shape) <span class="jp-term">連続ターン</span></h2>
-                <p>畫出完整的 C 型。在換刃前，必須有「耐心」讓板子完全放平 (Flat Base)。</p>
-                <div class="key-points">
-                    <div class="point">Patience: 板頭朝下時保持平板</div>
-                    <div class="point">Finish: 轉彎直到板子橫向減速</div>
-                </div>
+                <h2><span class="badge">L3</span> S型轉彎 <span class="jp-term">連続ターン</span></h2>
+                <p>畫出 C 型。換刃前保持耐心 (Flat Base)。</p>
             </div>
             <div class="visual-area">
                 <div class="stage snow-scroll">
@@ -470,7 +512,6 @@
                     <div class="trace-layer">
                         <svg viewBox="0 0 200 400" preserveAspectRatio="none"><path d="M100,-50 C100,0 20,50 20,100 C20,150 100,150 100,200 C100,250 180,250 180,300 C180,350 100,400 100,450" fill="none" stroke="white" stroke-width="3" stroke-dasharray="10"/></svg>
                     </div>
-                    
                     <div class="center-wrapper sturn-c-shape">
                         <div class="pro-board sturn-action">
                             <div class="pro-helmet">
@@ -486,7 +527,7 @@
         <section class="skill-section">
             <div class="content-area">
                 <h2><span class="badge">L4</span> 極限刻滑 <span class="jp-term">カービング</span></h2>
-                <p>高速高立刃。板底清晰可見，無刮雪動作。</p>
+                <p>高速高立刃。板底清晰可見。</p>
             </div>
             <div class="visual-area">
                 <div class="stage" style="background:#e2e8f0;">
@@ -503,7 +544,7 @@
         <section class="skill-section">
             <div class="content-area">
                 <h2><span class="badge">L5</span> 奧利跳 <span class="jp-term">オーリー</span></h2>
-                <p>蹲下、彈起、收腿。觀察動畫中板子的變形。</p>
+                <p>蹲下、彈起、收腿。</p>
             </div>
             <div class="visual-area">
                 <div class="stage stage-side" style="background:#cbd5e1;">
@@ -531,16 +572,8 @@
         }
         function setSafety(type, btn) {
             const rider = document.getElementById('safetyRider');
-            const info = document.getElementById('safetyInfo');
-            rider.className = 'side-rider'; 
-            void rider.offsetWidth; 
-            if(type === 'fall') {
-                rider.classList.add('anim-fall');
-                info.innerHTML = '<div class="point">摔倒時：雙手抱胸，背部著地</div>';
-            } else {
-                rider.classList.add('anim-stand');
-                info.innerHTML = '<div class="point">翻身：將板子舉向空中轉體</div>';
-            }
+            rider.className = 'side-rider'; void rider.offsetWidth; 
+            if(type === 'fall') { rider.classList.add('anim-fall'); } else { rider.classList.add('anim-stand'); }
             updateBtns(btn);
         }
         function setLeaf(type, btn) {
