@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNOWBOARD</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* --- Colors --- */
+            --accent: #3b82f6;      /* Regular / Heel */
+            --danger: #ef4444;      /* Goofy / Toe */
+            --dark: #0f172a;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            
+            /* --- Materials --- */
+            --board-top: #334155;
+            --board-base: #f59e0b;
+            
+            /* --- Easing --- */
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--dark);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+            padding-bottom: 80px;
+        }
+
+        /* --- Header --- */
+        header {
+            padding: 4rem 1rem 2rem; text-align: center;
+            background: radial-gradient(circle at top, #1e293b 0%, var(--dark) 100%);
+        }
+        h1 {
+            font-size: 2.5rem; font-weight: 900;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+        .subtitle { color: var(--text-sub); font-size: 0.9rem; letter-spacing: 1px; }
+
+        /* --- Grid Layout --- */
+        .container { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem; }
+
+        .skill-section {
+            display: grid;
+            grid-template-columns: 1fr 1.6fr;
+            gap: 3rem;
+            align-items: center;
+            padding: 4rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        @media (max-width: 900px) {
+            .skill-section { grid-template-columns: 1fr; gap: 1.5rem; text-align: center; }
+            .content-area { order: 2; } 
+            .visual-area { order: 1; }
+            h2 { justify-content: center; }
+            .key-points { display: inline-block; text-align: left; }
+            .btn-group { justify-content: center; }
+        }
+
+        /* --- Typography & Buttons --- */
+        h2 { font-size: 1.8rem; margin-bottom: 1rem; color: white; display: flex; align-items: center; gap: 10px; }
+        .badge { background: var(--accent); font-size: 0.8rem; padding: 4px 8px; border-radius: 6px; white-space: nowrap;}
+        .jp-term { font-size: 0.8rem; color: var(--text-sub); background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-weight: normal; }
+        p { color: var(--text-sub); font-size: 1rem; margin-bottom: 1.5rem; }
+        
+        .key-points { margin-bottom: 1.5rem; }
+        .point { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; font-size: 0.95rem; font-weight: 600; }
+        .point::before { content: '•'; color: var(--accent); font-size: 1.2rem; line-height: 1; }
+
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn {
+            background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: 0.2s; font-weight: 600;
+        }
+        .btn:hover { background: rgba(255,255,255,0.2); }
+        .btn.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 4px 12px rgba(59,130,246,0.4); }
+        .btn.danger.active { background: var(--danger); border-color: var(--danger); box-shadow: 0 4px 12px rgba(239,68,68,0.4); }
+
+        /* --- Stage System --- */
+        .stage {
+            width: 100%;
+            min-height: 300px; /* Mobile Fix */
+            aspect-ratio: 16/10;
+            background: #cbd5e1;
+            border-radius: 20px;
+            position: relative; overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            perspective: 800px;
+            transform-style: preserve-3d;
+        }
+        
+        /* Layer Management */
+        .atmosphere {
+            position: absolute; inset: 0; pointer-events: none; z-index: 1;
+            background: radial-gradient(circle at center, transparent 30%, rgba(15, 23, 42, 0.4) 100%);
+        }
+        .noise {
+            position: absolute; inset: 0; opacity: 0.05; pointer-events: none; z-index: 2;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+        
+        /* Content Layers (Z-10) */
+        .center-wrapper, .side-rider, .z-motion, .sturn-path, .carve-anim, .ollie-anim, .trace-layer {
+            z-index: 10;
+        }
+
+        .view-label {
+            position: absolute; bottom: 15px; right: 15px;
+            background: rgba(15,23,42,0.8); color: white; padding: 4px 10px;
+            border-radius: 4px; font-size: 0.75rem; font-weight: 700; 
+            z-index: 20; backdrop-filter: blur(4px);
+        }
+
+        /* --- 3D Models --- */
+        .center-wrapper {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex; justify-content: center; align-items: center;
+            transform-style: preserve-3d;
+        }
+
+        @media (max-width: 600px) {
+            .stance-v { transform: scale(0.85); } 
+            .side-rider { transform: scale(0.9) translateX(-50%); transform-origin: bottom center; }
+        }
+
+        .pro-board {
+            width: 150px; height: 42px;
+            background: linear-gradient(to right, var(--board-top), #475569);
+            border-radius: 21px; position: relative;
+            transform-style: preserve-3d;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            transition: transform 0.6s var(--ease-smooth);
+            will-change: transform;
+        }
+        .pro-board::before { content: ''; position: absolute; inset: 0; background: var(--board-base); border-radius: 21px; transform: translateZ(-2px) rotateX(180deg); backface-visibility: hidden; }
+        .pro-board::after { content: ''; position: absolute; inset: -1px; border: 2px solid #94a3b8; border-radius: 22px; transform: translateZ(-1px); z-index: -1; }
+
+        .pro-helmet {
+            width: 28px; height: 28px; background: #fbbf24; border-radius: 50%;
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) translateZ(16px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: transform 0.4s var(--ease-smooth);
+            will-change: transform;
+        }
+        .pro-goggles { width: 20px; height: 10px; background: #3b82f6; border-radius: 5px; position: absolute; top: 9px; left: 4px; border: 2px solid var(--dark); }
+        .pro-strap { width: 24px; height: 6px; background: var(--dark); position: absolute; top: 11px; left: 2px; display: none; z-index: -1; }
+
+        /* --- SCENE 1: STANCE --- */
+        .stance-v {
+            width: 60px; height: 180px; background: var(--board-top);
+            border-radius: 30px; position: relative; box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+        }
+        .binding {
+            width: 30px; height: 45px; border: 2px solid rgba(255,255,255,0.8); border-radius: 8px;
+            position: absolute; left: 50%; transform: translateX(-50%);
+            display: flex; justify-content: center; align-items: center;
+            font-weight: 800; color: white; transition: 0.4s; font-size: 0.9rem;
+        }
+        [data-stance="regular"] .b-left { bottom: 25px; transform: translateX(-50%) rotate(15deg); background: rgba(59,130,246,0.6); border-color:var(--accent);}
+        [data-stance="regular"] .b-right { top: 25px; transform: translateX(-50%) rotate(0deg); }
+        [data-stance="goofy"] .b-right { bottom: 25px; transform: translateX(-50%) rotate(-15deg); background: rgba(239,68,68,0.6); border-color:var(--danger);}
+        [data-stance="goofy"] .b-left { top: 25px; transform: translateX(-50%) rotate(0deg); }
+
+        /* --- SCENE 2: SAFETY --- */
+        .stage-side { align-items: flex-end; padding-bottom: 40px; background: #e2e8f0; }
+        .floor { position: absolute; bottom: 35px; width: 100%; height: 2px; background: #94a3b8; z-index: 5; }
+
+        .side-rider {
+            width: 40px; height: 100px; position: absolute; bottom: 37px; left: 50%; margin-left: -20px;
+            transform-origin: bottom center; will-change: transform;
+        }
+        .sr-board { width: 110px; height: 10px; background: var(--board-top); border-radius: 5px; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); }
+        .sr-body { width: 20px; height: 45px; background: var(--dark); border-radius: 10px; position: absolute; top: 0; left: 10px; }
+        .sr-head { width: 22px; height: 22px; background: #fbbf24; border-radius: 50%; position: absolute; top: -22px; left: 9px; }
+        .sr-arm { width: 8px; height: 38px; background: var(--accent); border-radius: 4px; position: absolute; top: 5px; left: 15px; transform-origin: top center; }
+        .sr-leg { width: 12px; height: 38px; background: var(--dark); border-radius: 4px; position: absolute; bottom: 10px; left: 14px; }
+
+        .anim-fall { animation: fallSeq 3s ease-in-out infinite; }
+        @keyframes fallSeq {
+            0% { transform: rotate(0deg); } 20% { transform: rotate(-10deg); }
+            40% { transform: translateY(20px) rotate(-85deg); } 45% { transform: translateY(25px) rotate(-90deg); }
+            100% { transform: translateY(20px) rotate(-90deg); }
+        }
+        .anim-fall .sr-arm { animation: armSafe 3s infinite; }
+        @keyframes armSafe { 0%, 20% { transform: rotate(0deg); } 30%, 100% { transform: rotate(-130deg); background: #10b981; height: 22px; } }
+
+        .anim-stand { animation: standSeq 6s ease-in-out infinite; }
+        @keyframes standSeq {
+            0% { transform: translateY(20px) rotate(-90deg); } 20% { transform: translateY(-20px) rotate(-90deg); }
+            30% { transform: translateY(-20px) rotate(90deg); } 50% { transform: translateY(20px) rotate(90deg); }
+            65% { transform: translateY(10px) rotate(45deg); } 85%, 100% { transform: translateY(0) rotate(0deg); }
+        }
+
+        /* --- SCENE 3: LEAF (Scrolling) --- */
+        .snow-scroll {
+            background: linear-gradient(#cbd5e1 2px, transparent 2px), linear-gradient(90deg, #cbd5e1 2px, transparent 2px);
+            background-size: 40px 40px; background-color: #f1f5f9;
+            animation: scrollY 1s linear infinite;
+        }
+        @keyframes scrollY { to { background-position: 0 -40px; } }
+
+        .z-motion { animation: zSwing 4s ease-in-out infinite; transform-style: preserve-3d; will-change: transform; }
+        @keyframes zSwing {
+            0%, 100% { transform: translate(-50%, -50%) translateX(0); }
+            25% { transform: translate(-50%, -50%) translateX(-60px); }
+            75% { transform: translate(-50%, -50%) translateX(60px); }
+        }
+
+        [data-leaf="heel"] .pro-board { transform: rotateX(35deg); }
+        [data-leaf="heel"] .pro-goggles { display: block; }
+        [data-leaf="toe"] .pro-board { transform: rotateX(-35deg); }
+        [data-leaf="toe"] .pro-helmet { transform: translate(-50%, -50%) translateZ(16px) rotate(180deg); }
+        [data-leaf="toe"] .pro-strap { display: block; }
+
+        /* --- SCENE 4: GARLANDS (Stomp It Tutorial) --- */
+        /* J-Shape / Garland Path */
+        .garland-path { animation: garlandMove 4s ease-in-out infinite; will-change: transform; }
+        @keyframes garlandMove {
+            0%, 100% { transform: translate(-50%, -50%) translateX(0); }
+            50% { transform: translate(-50%, -50%) translateX(80px); } /* 移動距離 */
+        }
+        
+        .garland-anim { animation: garlandRoll 4s ease-in-out infinite; will-change: transform; width: 44px; height: 140px; }
+        
+        /* Heel Garland: Heel -> Flat -> Heel (Never Toe) */
+        [data-garland="heel"] .garland-anim { animation-name: gHeel; }
+        @keyframes gHeel {
+            0%, 100% { transform: rotateZ(-45deg) rotateX(30deg); } /* Heel Traverse */
+            40%, 60% { transform: rotateZ(0deg) rotateX(0deg); }    /* Point Down (Flat) */
+        }
+        [data-garland="heel"] .pro-helmet { animation: headHeel 4s infinite; }
+        @keyframes headHeel {
+            0%, 100% { transform: translate(-50%, -50%) translateZ(16px) rotate(-30deg); }
+            40%, 60% { transform: translate(-50%, -50%) translateZ(16px) rotate(0deg); }
+        }
+
+        /* Toe Garland: Toe -> Flat -> Toe (Never Heel) */
+        [data-garland="toe"] .garland-anim { animation-name: gToe; }
+        @keyframes gToe {
+            0%, 100% { transform: rotateZ(45deg) rotateX(-30deg); } /* Toe Traverse */
+            40%, 60% { transform: rotateZ(0deg) rotateX(0deg); }    /* Point Down (Flat) */
+        }
+        [data-garland="toe"] .pro-helmet { animation: headToe 4s infinite; }
+        @keyframes headToe {
+            0%, 100% { transform: translate(-50%, -50%) translateZ(16px) rotate(30deg); }
+            40%, 60% { transform: translate(-50%, -50%) translateZ(16px) rotate(0deg); }
+        }
+
+        /* --- SCENE 5: S-TURN (C-Shape) --- */
+        .trace-layer { position: absolute; top: -50%; left: 0; width: 100%; height: 200%; opacity: 0.4; animation: scrollY 4s linear infinite; pointer-events: none;}
+        
+        .sturn-c-shape { animation: cPath 4s ease-in-out infinite; will-change: transform; }
+        @keyframes cPath {
+            0% { transform: translate(-50%, -50%) translateX(0); }
+            25% { transform: translate(-50%, -50%) translateX(-80px); }
+            50% { transform: translate(-50%, -50%) translateX(0); }
+            75% { transform: translate(-50%, -50%) translateX(80px); }
+            100% { transform: translate(-50%, -50%) translateX(0); }
+        }
+        
+        .sturn-action { width: 44px; height: 140px; animation: cRoll 4s ease-in-out infinite; will-change: transform; }
+        @keyframes cRoll {
+            0% { transform: rotateZ(0deg) rotateX(0deg); }
+            25% { transform: rotateZ(-70deg) rotateX(35deg); } /* Full Heel Turn */
+            45% { transform: rotateZ(-10deg) rotateX(0deg); } 
+            50% { transform: rotateZ(0deg) rotateX(0deg); }    /* Flat Patience */
+            55% { transform: rotateZ(10deg) rotateX(0deg); }
+            75% { transform: rotateZ(70deg) rotateX(-35deg); } /* Full Toe Turn */
+            100% { transform: rotateZ(0deg) rotateX(0deg); }
+        }
+        .sturn-action .pro-helmet { animation: cHead 4s ease-in-out infinite; }
+        @keyframes cHead {
+            0% { transform: translate(-50%, -50%) translateZ(16px) rotate(-30deg); }
+            20% { transform: translate(-50%, -50%) translateZ(16px) rotate(0deg); }
+            45% { transform: translate(-50%, -50%) translateZ(16px) rotate(30deg); }
+            75% { transform: translate(-50%, -50%) translateZ(16px) rotate(0deg); }
+            95% { transform: translate(-50%, -50%) translateZ(16px) rotate(-30deg); }
+            100% { transform: translate(-50%, -50%) translateZ(16px) rotate(-30deg); }
+        }
+
+        /* --- SCENE 6: CARVING --- */
+        .speed-fx {
+            position: absolute; inset: 0;
+            background: repeating-linear-gradient(90deg, transparent, transparent 95%, rgba(255,255,255,0.5) 98%, transparent 100%);
+            transform: skewX(-20deg); animation: rush 0.1s linear infinite; z-index: 5;
+        }
+        @keyframes rush { to { background-position: -200px 0; } }
+        
+        .carve-anim { animation: carve 2.5s ease-in-out infinite alternate; will-change: transform; }
+        @keyframes carve {
+            0% { transform: translateX(-80px) rotateX(65deg) rotateZ(15deg); }
+            100% { transform: translateX(80px) rotateX(-65deg) rotateZ(-15deg); }
+        }
+
+        /* --- SCENE 7: OLLIE --- */
+        .ollie-anim { 
+            animation: ollieMove 3s linear infinite; position: absolute; bottom: 37px; width: 100px;
+            will-change: transform;
+        }
+        @keyframes ollieMove {
+            0% { left: -30%; transform: translateX(0); }
+            100% { left: 130%; transform: translateX(0); }
+        }
+        .o-group { animation: ollieJump 3s linear infinite; }
+        @keyframes ollieJump {
+            0%, 10% { transform: translateY(0); } 20% { transform: translateY(5px); }
+            30% { transform: rotate(-20deg); } 50% { transform: translateY(-80px) rotate(-5deg); }
+            60% { transform: translateY(-85px) rotate(5deg); } 80% { transform: translateY(5px) rotate(0deg); }
+            90%, 100% { transform: translateY(0); }
+        }
+        .ollie-anim .sr-leg { animation: legSpring 3s linear infinite; height: 38px; }
+        @keyframes legSpring {
+            0%, 10% { height: 38px; } 20% { height: 25px; } 30% { height: 45px; }
+            50% { height: 25px; } 80% { height: 25px; } 90%, 100% { height: 38px; }
+        }
+
+    </style>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-PY0DTLM60T"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-PY0DTLM60T');
+    </script>
+</head>
+<body>
+
+    <header>
+        <div class="container">
+            <h1>SNOWBOARD</h1>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <section class="skill-section">
+            <div class="content-area">
+                <h2><span class="badge">L0</span> 站姿設定 <span class="jp-term">スタンス</span></h2>
+                <p>左腳前 Regular，右腳前 Goofy。初學者建議先用 Regular。</p>
+                <div class="btn-group">
+                    <button class="btn active" onclick="setStance('regular', this)">Regular</button>
+                    <button class="btn danger" onclick="setStance('goofy', this)">Goofy</button>
+                </div>
+            </div>
+            <div class="visual-area">
+                <div class="stage">
+                    <div class="atmosphere"></div><div class="noise"></div>
+                    <div class="center-wrapper">
+                        <div class="stance-v" id="stanceBoard" data-stance="regular">
+                            <div class="binding b-left">L</div>
+                            <div class="binding b-right">R</div>
+                        </div>
+                    </div>
+                    <div class="view-label">TOP VIEW</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="skill-section">
+            <div class="content-area">
+                <h2><span class="badge">L0.5</span> 安全摔倒與站立 <span class="jp-term">転び方</span></h2>
+                <p>摔倒時雙手抱胸。站起時利用翻身轉體。</p>
+                <div class="key-points" id="safetyInfo">
+                    <div class="point">摔倒時：雙手抱胸，背部著地</div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn danger active" onclick="setSafety('fall', this)">摔倒 (Fall)</button>
+                    <button class="btn" onclick="setSafety('stand', this)">站起 (Stand)</button>
+                </div>
+            </div>
+            <div class="visual-area">
+                <div class="stage stage-side">
+                    <div class="atmosphere"></div><div class="noise"></div>
+                    <div class="floor"></div>
+                    <div class="side-rider anim-fall" id="safetyRider">
+                        <div class="sr-board"></div>
+                        <div class="sr-leg"></div>
+                        <div class="sr-body"></div>
+                        <div class="sr-head"></div>
+                        <div class="sr-arm"></div>
+                    </div>
+                    <div class="view-label">SIDE VIEW</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="skill-section">
+            <div class="content-area">
+                <h2><span class="badge">L1/2</span> 落葉飄 <span class="jp-term">木の葉滑り</span></h2>
+                <p>Z 字型下坡，保持單一邊刃煞車。</p>
+                <div class="btn-group">
+                    <button class="btn active" onclick="setLeaf('heel', this)">Heel Side</button>
+                    <button class="btn danger" onclick="setLeaf('toe', this)">Toe Side</button>
+                </div>
+            </div>
+            <div class="visual-area">
+                <div class="stage snow-scroll">
+                    <div class="atmosphere"></div><div class="noise"></div>
+                    <div class="center-wrapper z-motion" id="leafContainer" data-leaf="heel">
+                        <div class="pro-board">
+                            <div class="pro-helmet">
+                                <div class="pro-goggles"></div>
+                                <div class="pro-strap"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="view-label">SCROLL</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="skill-section">
+            <div class="content-area">
+                <h2><span class="badge">L2.5</span> 花環練習 (Garlands) <span class="jp-term">ガーランド</span></h2>
+                <p>這是 S Turn 的前置練習。不要換刃，練習「直板加速 (Flat)」後轉回「同側煞車」。</p>
+                <div class="key-points">
+                    <div class="point">直板 (Flat) = 加速 (Point Down)</div>
+                    <div class="point">轉回同側邊刃 = 減速 (Control)</div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn active" onclick="setGarland('heel', this)">Heel Garland</button>
+                    <button class="btn danger" onclick="setGarland('toe', this)">Toe Garland</button>
+                </div>
+            </div>
+            <div class="visual-area">
+                <div class="stage snow-scroll">
+                    <div class="atmosphere"></div><div class="noise"></div>
+                    <div class="trace-layer" style="opacity:0.3;">
+                         <svg viewBox="0 0 200 400" preserveAspectRatio="none"><path d="M50,0 Q100,200 50,400" fill="none" stroke="white" stroke-width="4" stroke-dasharray="10"/></svg>
+                    </div>
+                    
+                    <div class="center-wrapper garland-path" id="garlandContainer" data-garland="heel">
+                        <div class="pro-board garland-anim">
+                            <div class="pro-helmet">
+                                <div class="pro-goggles"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="view-label">TOP VIEW</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="skill-section">
+            <div class="content-area">
+                <h2><span class="badge">L3</span> S型轉彎 (C-Shape) <span class="jp-term">連続ターン</span></h2>
+                <p>畫出完整的 C 型。在換刃前，必須有「耐心」讓板子完全放平 (Flat Base)。</p>
+                <div class="key-points">
+                    <div class="point">Patience: 板頭朝下時保持平板</div>
+                    <div class="point">Finish: 轉彎直到板子橫向減速</div>
+                </div>
+            </div>
+            <div class="visual-area">
+                <div class="stage snow-scroll">
+                    <div class="atmosphere"></div><div class="noise"></div>
+                    <div class="trace-layer">
+                        <svg viewBox="0 0 200 400" preserveAspectRatio="none"><path d="M100,-50 C100,0 20,50 20,100 C20,150 100,150 100,200 C100,250 180,250 180,300 C180,350 100,400 100,450" fill="none" stroke="white" stroke-width="3" stroke-dasharray="10"/></svg>
+                    </div>
+                    
+                    <div class="center-wrapper sturn-c-shape">
+                        <div class="pro-board sturn-action">
+                            <div class="pro-helmet">
+                                <div class="pro-goggles"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="view-label">TOP VIEW</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="skill-section">
+            <div class="content-area">
+                <h2><span class="badge">L4</span> 極限刻滑 <span class="jp-term">カービング</span></h2>
+                <p>高速高立刃。板底清晰可見，無刮雪動作。</p>
+            </div>
+            <div class="visual-area">
+                <div class="stage" style="background:#e2e8f0;">
+                    <div class="atmosphere"></div><div class="noise"></div>
+                    <div class="speed-fx"></div>
+                    <div class="center-wrapper carve-anim" style="bottom: 40px; top:auto;">
+                        <div class="pro-board"></div>
+                    </div>
+                    <div class="view-label">FOLLOW CAM</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="skill-section">
+            <div class="content-area">
+                <h2><span class="badge">L5</span> 奧利跳 <span class="jp-term">オーリー</span></h2>
+                <p>蹲下、彈起、收腿。觀察動畫中板子的變形。</p>
+            </div>
+            <div class="visual-area">
+                <div class="stage stage-side" style="background:#cbd5e1;">
+                    <div class="atmosphere"></div><div class="noise"></div>
+                    <div class="floor"></div>
+                    <div class="side-rider ollie-anim">
+                        <div class="o-group">
+                            <div class="sr-board"></div>
+                            <div class="sr-leg"></div>
+                            <div class="sr-body"></div>
+                            <div class="sr-head"></div>
+                        </div>
+                    </div>
+                    <div class="view-label">SIDE VIEW</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        function setStance(type, btn) {
+            document.getElementById('stanceBoard').setAttribute('data-stance', type);
+            updateBtns(btn);
+        }
+        function setSafety(type, btn) {
+            const rider = document.getElementById('safetyRider');
+            const info = document.getElementById('safetyInfo');
+            rider.className = 'side-rider'; 
+            void rider.offsetWidth; 
+            if(type === 'fall') {
+                rider.classList.add('anim-fall');
+                info.innerHTML = '<div class="point">摔倒時：雙手抱胸，背部著地</div>';
+            } else {
+                rider.classList.add('anim-stand');
+                info.innerHTML = '<div class="point">翻身：將板子舉向空中轉體</div>';
+            }
+            updateBtns(btn);
+        }
+        function setLeaf(type, btn) {
+            document.getElementById('leafContainer').setAttribute('data-leaf', type);
+            updateBtns(btn);
+        }
+        function setGarland(type, btn) {
+            document.getElementById('garlandContainer').setAttribute('data-garland', type);
+            updateBtns(btn);
+        }
+        function updateBtns(clickedBtn) {
+            const group = clickedBtn.parentElement;
+            group.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+            clickedBtn.classList.add('active');
+        }
+    </script>
+</body>
+</html>
