@@ -153,7 +153,11 @@
                 alert_no_input: "請輸入資料",
                 alert_copied: "資料已複製到剪貼簿！",
                 alert_updated: "成功更新 {n} 筆資料！",
-                chart_label: "工時 (小時)"
+                chart_label: "工時 (小時)",
+                err_year_format: "❌ 年份格式錯誤 (行 {line}): {content}\n年份必須是 4 位數 (YYYY)。",
+                err_date_invalid: "❌ 日期數值錯誤 (行 {line}): {content}\n月份 (1-12) 或日期 (1-31) 不合理。",
+                err_format_general: "❌ 格式無法辨識 (行 {line}): {content}\n請使用 YYYY/MM/DD 或 MM/DD 格式。",
+                msg_success: "✅ 成功更新 {n} 筆資料！"
             },
             'ja': {
                 app_title: "⚡ 出勤表",
@@ -176,7 +180,11 @@
                 alert_no_input: "データを入力してください",
                 alert_copied: "クリップボードにコピーしました！",
                 alert_updated: "{n} 件のデータを更新しました！",
-                chart_label: "時間 (h)"
+                chart_label: "時間 (h)",
+                err_year_format: "❌ 年形式エラー (行 {line}): {content}\n年は4桁 (YYYY) で入力してください。",
+                err_date_invalid: "❌ 日付値エラー (行 {line}): {content}\n月 (1-12) または日 (1-31) が不正です。",
+                err_format_general: "❌ 不明な形式 (行 {line}): {content}\nYYYY/MM/DD または MM/DD 形式を使用してください。",
+                msg_success: "✅ {n} 件のデータを更新しました！"
             },
             'en': {
                 app_title: "⚡ Work_Log",
@@ -199,7 +207,11 @@
                 alert_no_input: "No Input Data",
                 alert_copied: "Copied to clipboard!",
                 alert_updated: "Updated {n} records.",
-                chart_label: "Hours"
+                chart_label: "Hours",
+                err_year_format: "❌ Year Format Error (Line {line}): {content}\nYear must be 4 digits (YYYY).",
+                err_date_invalid: "❌ Invalid Date (Line {line}): {content}\nCheck Month (1-12) or Day (1-31).",
+                err_format_general: "❌ Unknown Format (Line {line}): {content}\nPlease use YYYY/MM/DD or MM/DD.",
+                msg_success: "✅ Successfully updated {n} records!"
             }
         };
 
@@ -350,31 +362,70 @@
 
         function parseAndSave() {
             const rawText = document.getElementById('rawInput').value;
-            if(!rawText.trim()) return alert(t('alert_no_input')); // Use t()
+            // 檢查空值
+            if(!rawText.trim()) return alert(t('alert_no_input')); 
+            
             const currentYear = new Date().getFullYear();
             const lines = rawText.trim().split('\n');
-            let count = 0;
+            let tempRecords = [];
 
-            lines.forEach(line => {
-                line = line.trim();
-                if (!line) return;
+            // 正則表達式
+            const regexWithYear = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/;
+            const regexNoYear = /^(\d{1,2})[\/\-](\d{1,2})$/;
+
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (!line) continue;
+
                 const parts = line.split(/\s+/);
                 const dateStr = parts[0]; 
                 const timeRanges = parts.slice(1);
                 let formattedDate = "";
-
-                if(dateStr.includes('/')) {
-                    const [m, d] = dateStr.split('/');
-                    if(dateStr.split('/').length === 3) formattedDate = dateStr.replace(/\//g, '-');
-                    else {
-                         let y = currentYear;
-                         const m_int = parseInt(m);
-                         const nowM = new Date().getMonth() + 1;
-                         if(m_int > nowM + 6) y -= 1;
-                         formattedDate = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+                
+                // --- 邏輯 A: 有年份 (嚴格檢查 4 位數) ---
+                if (regexWithYear.test(dateStr)) {
+                    const match = dateStr.match(regexWithYear);
+                    const y = parseInt(match[1]);
+                    const m = parseInt(match[2]);
+                    const d = parseInt(match[3]);
+                    
+                    // 日期合理性檢查
+                    if (m < 1 || m > 12 || d < 1 || d > 31) {
+                         alert(t('err_date_invalid').replace('{line}', i+1).replace('{content}', dateStr));
+                         return; 
                     }
-                } else if(dateStr.includes('-')) formattedDate = dateStr;
+                    formattedDate = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 
+                // --- 邏輯 B: 無年份 (自動帶入) ---
+                } else if (regexNoYear.test(dateStr)) {
+                    const match = dateStr.match(regexNoYear);
+                    const m = parseInt(match[1]);
+                    const d = parseInt(match[2]);
+                    
+                    if (m < 1 || m > 12 || d < 1 || d > 31) {
+                         alert(t('err_date_invalid').replace('{line}', i+1).replace('{content}', dateStr));
+                         return;
+                    }
+
+                    // 智慧判斷年份
+                    let y = currentYear;
+                    const nowM = new Date().getMonth() + 1;
+                    if (m > nowM + 6) y -= 1;
+                    
+                    formattedDate = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+                // --- 邏輯 C: 格式錯誤 ---
+                } else {
+                    // 如果輸入了 2 碼年份 (如 25/01/01)，會判定為格式錯誤 (要求 4 碼)
+                    if(dateStr.match(/^\d{2}[\/\-]\d{1,2}[\/\-]\d{1,2}$/)) {
+                        alert(t('err_year_format').replace('{line}', i+1).replace('{content}', dateStr));
+                    } else {
+                        alert(t('err_format_general').replace('{line}', i+1).replace('{content}', dateStr));
+                    }
+                    return;
+                }
+
+                // 時間解析 (保持不變)
                 let dailyMin = 0;
                 let segments = [];
                 const fmt = t => (t && t.length === 4) ? `${t.slice(0,2)}:${t.slice(2)}` : t;
@@ -397,10 +448,13 @@
                 });
 
                 if(segments.length > 0) {
-                    records = records.filter(r => r.date !== formattedDate);
-                    records.push({ date: formattedDate, minutes: dailyMin, segments: segments, timestamp: Date.now() });
-                    count++;
+                    tempRecords.push({ date: formattedDate, minutes: dailyMin, segments: segments, timestamp: Date.now() });
                 }
+            }
+
+            tempRecords.forEach(newRec => {
+                records = records.filter(r => r.date !== newRec.date);
+                records.push(newRec);
             });
 
             records.sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -408,7 +462,7 @@
             initFilters(); renderHistoryList(); renderCalendar(); // Refresh Calendar
             document.getElementById('rawInput').value = '';
             toggleImport();
-            alert(t('alert_updated').replace('{n}', count)); // Use t()
+            alert(t('msg_success').replace('{n}', tempRecords.length));
         }
 
         // --- GUI Logic ---
