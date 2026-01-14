@@ -11,6 +11,8 @@
     <style>
         body { font-family: 'Menlo', 'Monaco', 'Courier New', monospace; }
         .chip { transition: all 0.2s; }
+        /* 日曆格子的動畫 */
+        .cal-day:hover { background-color: rgba(52, 211, 153, 0.1); }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -40,7 +42,7 @@
     </div>
 
     <div class="max-w-md mx-auto p-4 space-y-6">
-        
+
         <div class="bg-slate-900 border border-slate-800 rounded-lg p-5 shadow-2xl">
             <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
                 <span class="text-slate-400 text-sm font-bold" data-i18n="stats_title">DASHBOARD</span>
@@ -63,7 +65,7 @@
                 </h2>
                 <span id="editModeBadge" class="hidden text-xs bg-yellow-900/50 text-yellow-200 border border-yellow-700 px-2 py-1 rounded" data-i18n="badge_editing">EDITING</span>
             </div>
-            
+
             <div class="mb-4">
                 <input type="date" id="inputDate" class="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-200 focus:border-emerald-500 outline-none transition">
             </div>
@@ -79,6 +81,31 @@
                     Save Record
                 </button>
                 <button onclick="cancelEdit()" id="cancelBtn" class="hidden px-4 bg-slate-800 text-slate-400 hover:text-white rounded border border-slate-700 transition" data-i18n="btn_cancel">Cancel</button>
+            </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-5 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <button onclick="changeMonth(-1)" class="text-slate-400 hover:text-white p-2">◀</button>
+                <h2 class="text-lg font-bold text-slate-200" id="calMonthYear">Loading...</h2>
+                <button onclick="changeMonth(1)" class="text-slate-400 hover:text-white p-2">▶</button>
+            </div>
+
+            <div class="grid grid-cols-7 text-center mb-2">
+                <div class="text-xs text-rose-500 font-bold">Sun</div>
+                <div class="text-xs text-slate-500">Mon</div>
+                <div class="text-xs text-slate-500">Tue</div>
+                <div class="text-xs text-slate-500">Wed</div>
+                <div class="text-xs text-slate-500">Thu</div>
+                <div class="text-xs text-slate-500">Fri</div>
+                <div class="text-xs text-slate-500">Sat</div>
+            </div>
+
+            <div id="calendarGrid" class="grid grid-cols-7 gap-1 text-center"></div>
+
+            <div class="flex gap-4 justify-center mt-4 text-xs text-slate-500">
+                <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> 直班</div>
+                <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500"></span> 拆班(中休)</div>
             </div>
         </div>
 
@@ -220,6 +247,9 @@
 
         let records = JSON.parse(localStorage.getItem('workRecords')) || [];
         let selectedMonths = []; 
+        
+        // --- Calendar Vars ---
+        let calCurrentDate = new Date(); // Controls the month being viewed
 
         // --- Init ---
         initLanguage(); // <--- Run Language Init First
@@ -227,6 +257,93 @@
         addSegment();
         initFilters();
         renderHistoryList();
+        renderCalendar(); // Initial Calendar Render
+
+        // --- Calendar Logic (NEW) ---
+        function renderCalendar() {
+            const year = calCurrentDate.getFullYear();
+            const month = calCurrentDate.getMonth(); // 0-11
+            
+            // Update Header
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            document.getElementById('calMonthYear').innerText = `${year} ${monthNames[month]}`;
+
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+
+            // Calculate days
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const totalDays = lastDay.getDate();
+            const startDayIndex = firstDay.getDay(); // 0(Sun) - 6(Sat)
+
+            // 1. Previous Month Padding (Whitespace)
+            for(let i = 0; i < startDayIndex; i++) {
+                const div = document.createElement('div');
+                div.className = "p-2"; // Empty
+                grid.appendChild(div);
+            }
+
+            // 2. Days
+            for(let d = 1; d <= totalDays; d++) {
+                const dayStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const record = records.find(r => r.date === dayStr);
+                
+                const cell = document.createElement('div');
+                cell.className = "cal-day p-2 rounded cursor-pointer flex flex-col items-center justify-center h-12 relative border border-transparent hover:border-slate-700 transition";
+                cell.onclick = () => {
+                    // Update input date and load record if exists
+                    inputDate.value = dayStr;
+                    if(record) loadForEdit(dayStr);
+                    else {
+                        // Reset form for new entry
+                        cancelEdit();
+                        inputDate.value = dayStr;
+                    }
+                };
+
+                // Date Number
+                const numSpan = document.createElement('span');
+                numSpan.className = "text-sm font-mono z-10";
+                numSpan.innerText = d;
+                
+                // Color Logic
+                // If record exists:
+                // segment > 1 (Split Shift) -> Red
+                // segment == 1 (Straight Shift) -> Green
+                if (record) {
+                    const isSplit = record.segments.length > 1;
+                    const isWorking = record.segments.some(s => s.includes('???'));
+                    
+                    const dot = document.createElement('div');
+                    dot.className = `absolute bottom-1 w-1.5 h-1.5 rounded-full ${isSplit ? 'bg-rose-500 shadow-[0_0_5px_rgba(244,63,94,0.8)]' : 'bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)]'}`;
+                    
+                    if(isWorking) {
+                        dot.className = "absolute bottom-1 w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse";
+                    }
+
+                    cell.classList.add("bg-slate-800"); // Highlight background slightly for active days
+                    cell.appendChild(dot);
+                    numSpan.classList.add("text-white", "font-bold");
+                } else {
+                    numSpan.classList.add("text-slate-500");
+                }
+
+                // Check if Today
+                const todayStr = new Date().toISOString().slice(0,10);
+                if(dayStr === todayStr) {
+                    cell.classList.add("border-indigo-500", "border");
+                }
+
+                cell.appendChild(numSpan);
+                grid.appendChild(cell);
+            }
+        }
+
+        function changeMonth(offset) {
+            calCurrentDate.setMonth(calCurrentDate.getMonth() + offset);
+            renderCalendar();
+        }
 
         // --- Bulk Import ---
         function toggleImport() { document.getElementById('importPanel').classList.toggle('hidden'); }
@@ -288,7 +405,7 @@
 
             records.sort((a,b) => new Date(b.date) - new Date(a.date));
             localStorage.setItem('workRecords', JSON.stringify(records));
-            initFilters(); renderHistoryList();
+            initFilters(); renderHistoryList(); renderCalendar(); // Refresh Calendar
             document.getElementById('rawInput').value = '';
             toggleImport();
             alert(t('alert_updated').replace('{n}', count)); // Use t()
@@ -327,7 +444,7 @@
             records.push({date, minutes:dailyMin, segments:segs, timestamp:Date.now()});
             records.sort((a,b)=>new Date(b.date)-new Date(a.date));
             localStorage.setItem('workRecords',JSON.stringify(records));
-            resetForm(); initFilters(); renderHistoryList();
+            resetForm(); initFilters(); renderHistoryList(); renderCalendar(); // Refresh Calendar
         }
         
         // --- Filter & Display ---
