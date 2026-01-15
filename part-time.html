@@ -51,7 +51,10 @@
         <div class="snow-drift bg-slate-900 border border-slate-800 rounded-lg p-5 shadow-2xl">
             <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
                 <span class="text-slate-400 text-sm font-bold" data-i18n="stats_title">DASHBOARD</span>
-                <span class="text-xs text-emerald-500 cursor-pointer hover:underline" onclick="selectAllMonths()" data-i18n="select_all">[All]</span>
+                <div class="flex gap-3">
+                    <span id="viewToggleBtn" class="text-xs text-blue-400 cursor-pointer hover:text-blue-300 transition" onclick="toggleChartMode()" data-i18n="view_full">[📅 Full Month]</span>
+                    <span class="text-xs text-emerald-500 cursor-pointer hover:underline" onclick="selectAllMonths()" data-i18n="select_all">[All]</span>
+                </div>
             </div>
             <div id="monthFilter" class="flex flex-wrap gap-2 mb-4"></div>
             <div class="bg-slate-950 rounded border border-slate-800 p-4 text-center mb-4 relative overflow-hidden group">
@@ -162,7 +165,9 @@
                 err_year_format: "❌ 年份格式錯誤 (行 {line}): {content}\n年份必須是 4 位數 (YYYY)。",
                 err_date_invalid: "❌ 日期數值錯誤 (行 {line}): {content}\n月份 (1-12) 或日期 (1-31) 不合理。",
                 err_format_general: "❌ 格式無法辨識 (行 {line}): {content}\n請使用 YYYY/MM/DD 或 MM/DD 格式。",
-                msg_success: "✅ 成功更新 {n} 筆資料！"
+                msg_success: "✅ 成功更新 {n} 筆資料！",
+                view_work: "[📅 僅顯示出勤]",
+                view_full: "[📅 顯示全月]"
             },
             'ja': {
                 app_title: "⚡ 出勤表",
@@ -189,7 +194,9 @@
                 err_year_format: "❌ 年形式エラー (行 {line}): {content}\n年は4桁 (YYYY) で入力してください。",
                 err_date_invalid: "❌ 日付値エラー (行 {line}): {content}\n月 (1-12) または日 (1-31) が不正です。",
                 err_format_general: "❌ 不明な形式 (行 {line}): {content}\nYYYY/MM/DD または MM/DD 形式を使用してください。",
-                msg_success: "✅ {n} 件のデータを更新しました！"
+                msg_success: "✅ {n} 件のデータを更新しました！",
+                view_work: "[📅 出勤日のみ]",
+                view_full: "[📅 月間全体]"
             },
             'en': {
                 app_title: "⚡ Work_Log",
@@ -216,7 +223,9 @@
                 err_year_format: "❌ Year Format Error (Line {line}): {content}\nYear must be 4 digits (YYYY).",
                 err_date_invalid: "❌ Invalid Date (Line {line}): {content}\nCheck Month (1-12) or Day (1-31).",
                 err_format_general: "❌ Unknown Format (Line {line}): {content}\nPlease use YYYY/MM/DD or MM/DD.",
-                msg_success: "✅ Successfully updated {n} records!"
+                msg_success: "✅ Successfully updated {n} records!",
+                view_work: "[📅 Work Only]",
+                view_full: "[📅 Full Month]",
             }
         };
 
@@ -267,6 +276,9 @@
         
         // --- Calendar Vars ---
         let calCurrentDate = new Date(); // Controls the month being viewed
+
+        // 狀態變數：預設 false (只顯示上班日)
+        let showFullMonth = false;        
 
         // --- Init ---
         initLanguage(); // <--- Run Language Init First
@@ -505,7 +517,7 @@
             localStorage.setItem('workRecords',JSON.stringify(records));
             resetForm(); initFilters(); renderHistoryList(); renderCalendar(); // Refresh Calendar
         }
-        
+
         // --- Filter & Display ---
         function initFilters() {
             const all = [...new Set(records.map(r=>r.date.slice(0,7)))].sort().reverse();
@@ -521,48 +533,112 @@
             });
             updateStats();
         }
+
         function toggleMonth(m){
             selectedMonths.includes(m)?selectedMonths=selectedMonths.filter(x=>x!==m):selectedMonths.push(m);
             initFilters();
         }
+
         function selectAllMonths(){
             selectedMonths=[...new Set(records.map(r=>r.date.slice(0,7)))];
             initFilters();
         }
+
+        function toggleChartMode() {
+            showFullMonth = !showFullMonth;
+            
+            const btn = document.getElementById('viewToggleBtn');
+            
+            // ★ 修正邏輯：
+            // 變數是 true (正在看全月) -> 按鈕要顯示 "[📅 僅顯示出勤]" (view_work)
+            // 變數是 false (正在看出勤) -> 按鈕要顯示 "[📅 顯示全月]" (view_full)
+            btn.innerText = showFullMonth ? t('view_work') : t('view_full');
+            
+            // 重新渲染圖表
+            updateStats();
+        }
+
         function updateStats(){
-            const tg = records.filter(r=>selectedMonths.includes(r.date.slice(0,7)));
-            filteredTotal.innerText = formatMinutes(tg.reduce((a,b)=>a+b.minutes,0));
-            renderChart(tg);
+            // 1. 篩選資料
+            const tg = records.filter(r => selectedMonths.includes(r.date.slice(0,7)));
+            
+            // 2. 更新總時數文字
+            filteredTotal.innerText = formatMinutes(tg.reduce((a,b) => a + b.minutes, 0));
+            
+            // 3. 畫圖 (傳入 showFullMonth 狀態)
+            renderChart(tg, selectedMonths);
+            
+            // 4. 更新列表
             renderHistoryList(tg); 
         }
-        
-        function renderChart(dataArr){
-            const sorted = [...dataArr].sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+        function renderChart(dataArr, monthsList){
             const ctx = document.getElementById('hoursChart').getContext('2d');
             if(window.myChart) window.myChart.destroy();
+            
+            let labels = [];
+            let data = [];
+
+            // ★ 分歧點：判斷要用哪種模式渲染
+            if (showFullMonth) {
+                // --- 模式 A: 顯示完整月份 (包含空日) ---
+                const sortedMonths = [...monthsList].sort();
+                sortedMonths.forEach(mStr => {
+                    const [yearStr, monthStr] = mStr.split('-');
+                    const year = parseInt(yearStr);
+                    const month = parseInt(monthStr);
+                    const daysInMonth = new Date(year, month, 0).getDate();
+
+                    for(let d = 1; d <= daysInMonth; d++) {
+                        const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        const record = dataArr.find(r => r.date === dateKey);
+                        
+                        // 標籤顯示 DD (若跨月則顯示 MM/DD)
+                        const label = sortedMonths.length > 1 ? `${monthStr}/${String(d).padStart(2,'0')}` : String(d).padStart(2,'0');
+                        labels.push(label);
+                        data.push(record ? (record.minutes / 60).toFixed(1) : 0);
+                    }
+                });
+            } else {
+                // --- 模式 B (預設): 只顯示有上班的日子 ---
+                // 先把資料依日期排序
+                const sorted = [...dataArr].sort((a,b) => new Date(a.date) - new Date(b.date));
+                
+                labels = sorted.map(r => r.date.slice(5)); // 只取 MM-DD
+                data = sorted.map(r => (r.minutes / 60).toFixed(1));
+            }
             
             Chart.defaults.color = '#94a3b8';
             Chart.defaults.borderColor = '#1e293b';
 
             window.myChart = new Chart(ctx, {
-                type:'bar',
-                data:{
-                    labels:sorted.map(r=>r.date.slice(5)),
-                    datasets:[{
-                        label: t('chart_label'), // Translate Chart Label
-                        data:sorted.map(r=>(r.minutes/60).toFixed(1)),
-                        backgroundColor:'#10b981',
-                        borderRadius:2
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: t('chart_label'),
+                        data: data,
+                        backgroundColor: '#10b981',
+                        borderRadius: 2,
+                        // 如果是全月模式，給空值一點點高度以免看不見
+                        minBarLength: showFullMonth ? 2 : 0 
                     }]
                 },
-                options:{
-                    responsive:true, 
-                    plugins:{legend:{display:false}}, 
-                    scales:{y:{beginAtZero:true, grid:{color:'#1e293b'}}, x:{grid:{display:false}}}
+                options: {
+                    responsive: true, 
+                    plugins: { legend: {display: false} }, 
+                    scales: {
+                        y: { beginAtZero: true, grid: {color: '#1e293b'} }, 
+                        x: { 
+                            grid: { display: false },
+                            // 自動隱藏過密的標籤
+                            ticks: { autoSkip: true, maxTicksLimit: 31 }
+                        }
+                    }
                 }
             });
         }
-        
+
         function loadForEdit(d){
             const r=records.find(x=>x.date===d); if(!r)return;
             inputDate.value=r.date; timeSegments.innerHTML='';
@@ -571,35 +647,105 @@
             r.segments.forEach(s=>{ const[st,en]=s.split('-'); addSegment(st,en==='???'?'':en); });
             window.scrollTo({top:0,behavior:'smooth'});
         }
+
         function cancelEdit(){ resetForm(); }
+
         function resetForm(){ inputDate.valueAsDate=new Date(); timeSegments.innerHTML=''; addSegment(); editModeBadge.classList.add('hidden'); cancelBtn.classList.add('hidden'); inputSection.classList.remove('ring-2', 'ring-emerald-500'); }
-        
-        function renderHistoryList(targetRecords){
+
+        function renderHistoryList(targetRecords) {
             const listData = targetRecords || records;
             historyList.innerHTML='';
-            listData.forEach(r=>{
-                const li=document.createElement('li');
-                const work=r.segments.some(s=>s.includes('???'));
-                li.className=`flex justify-between items-center p-3 rounded border-l-4 border-t border-b border-r ${work?'bg-yellow-900/20 border-l-yellow-500 border-t-yellow-900/50 border-r-yellow-900/50 border-b-yellow-900/50':'bg-slate-900 border-l-emerald-500 border-slate-800'} transition hover:bg-slate-800`;
-                
-                // Translate Status
-                const workingText = t('status_working');
+            
+            listData.forEach(r => {
+                const li = document.createElement('li');
+                const work = r.segments.some(s => s.includes('???'));
+                const isSplit = r.segments.length > 1;
+                const breakTime = calculateBreakTime(r.segments);
 
-                li.innerHTML=`<div onclick="loadForEdit('${r.date}')" class="flex-grow cursor-pointer">
-                    <div class="flex items-center gap-2">
-                        <span class="font-bold text-slate-200 font-mono">${r.date}</span> 
-                        ${work?`<span class="text-[10px] bg-yellow-900 text-yellow-200 px-1 rounded border border-yellow-700 animate-pulse">${workingText}</span>`:''}
+                li.className = `group relative p-3 rounded border-l-4 border-t border-b border-r transition hover:bg-slate-800 cursor-pointer ${work?'bg-yellow-900/20 border-l-yellow-500 border-t-yellow-900/50 border-r-yellow-900/50 border-b-yellow-900/50':'bg-slate-900 border-slate-800'} ${isSplit && !work ? 'border-l-rose-500' : 'border-l-emerald-500'}`;
+                li.onclick = () => loadForEdit(r.date);
+
+                // --- 🔄 處理換行邏輯 (每2個一段) ---
+                let segmentHtml = '';
+                const cleanSegs = r.segments.map(s => s.replace('???', '...'));
+                
+                // 每 2 個切一刀
+                for (let i = 0; i < cleanSegs.length; i += 2) {
+                    // 取出目前這 2 個 (例如: index 0,1 或 2,3)
+                    const chunk = cleanSegs.slice(i, i + 2);
+                    // 加上 div 讓它換行，如果不是第一行，稍微加點 margin-top (mt-1)
+                    segmentHtml += `<div class="${i > 0 ? 'mt-1' : ''}">${chunk.join(', ')}</div>`;
+                }
+                // ----------------------------------
+
+                li.innerHTML = `
+                    <div class="flex justify-between items-start gap-3">
+                        
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                <span class="font-bold text-slate-200 font-mono text-base">${r.date}</span> 
+                                ${work ? `<span class="text-[10px] bg-yellow-900 text-yellow-200 px-1.5 py-0.5 rounded border border-yellow-700 animate-pulse">${t('status_working')}</span>` : ''}
+                                ${isSplit && !work ? '<span class="text-[10px] bg-rose-900/50 text-rose-300 px-1.5 py-0.5 rounded border border-rose-800">SPLIT</span>' : ''}
+                            </div>
+
+                            <div class="text-xs text-slate-400 font-mono leading-relaxed">
+                                ${segmentHtml}
+                            </div>
+
+                            ${breakTime > 0 ? `
+                            <div class="mt-1.5">
+                                <span class="inline-flex items-center gap-1 text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700/50">
+                                    ☕ ${formatMinutes(breakTime)} break
+                                </span>
+                            </div>` : ''}
+                        </div>
+
+                        <div class="flex-shrink-0 text-right pl-2 pt-1">
+                            <div class="font-bold text-lg ${isSplit && !work ? 'text-rose-400' : 'text-emerald-400'} font-mono leading-none">
+                                ${formatMinutes(r.minutes)}
+                            </div>
+                            <div class="text-[10px] text-slate-600 mt-1 uppercase tracking-wider">Work</div>
+                        </div>
+
                     </div>
-                    <div class="text-xs text-slate-500 font-mono mt-1">${r.segments.map(s=>s.replace('???','...')).join(', ')}</div>
-                </div>
-                <div class="font-bold text-emerald-400 font-mono">${formatMinutes(r.minutes)}</div>`;
+                `;
                 historyList.appendChild(li);
             });
         }
+
         function formatMinutes(m){ return `${Math.floor(m/60)}h ${m%60}m`; }
+
         function copyData(){ 
              const txt = records.map(r => `${r.date.replace(/-/g,'/').slice(5)} ${r.segments.map(s=>s.replace(':','').replace(':','')).join(' ')}`).join('\n');
              navigator.clipboard.writeText(txt).then(()=>alert(t('alert_copied')));
+        }
+
+        // ☕ 計算休息時間 (輔助函式)
+        function calculateBreakTime(segments) {
+            if (!segments || segments.length < 2) return 0; // 單段班沒有中間休息
+            
+            let totalBreak = 0;
+            
+            // 遍歷所有時段，計算 [上一段下班] 到 [這一段上班] 的距離
+            for (let i = 1; i < segments.length; i++) {
+                const prev = segments[i-1];
+                const curr = segments[i];
+
+                // 如果任何一段是 "???" (工作中)，就無法計算休息
+                if (prev.includes('???') || curr.includes('???')) continue;
+
+                const prevEndStr = prev.split('-')[1];
+                const currStartStr = curr.split('-')[0];
+
+                const prevEndMin = parseInt(prevEndStr.split(':')[0])*60 + parseInt(prevEndStr.split(':')[1]);
+                const currStartMin = parseInt(currStartStr.split(':')[0])*60 + parseInt(currStartStr.split(':')[1]);
+
+                let gap = currStartMin - prevEndMin;
+                if (gap < 0) gap += 1440; // 處理跨夜休息
+
+                totalBreak += gap;
+            }
+            return totalBreak;
         }
     </script>
 
